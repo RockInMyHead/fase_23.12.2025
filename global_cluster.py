@@ -34,7 +34,7 @@ except Exception as e:  # pragma: no cover
 # Импорт из существующего модуля
 from cluster_simple import (
     IMG_EXTS, is_image, imread_safe, ArcFaceEmbedder, ArcFaceConfig,
-    cluster_embeddings_hdbscan, EXCLUDED_COMMON_NAMES
+    cluster_embeddings_hdbscan, EXCLUDED_COMMON_NAMES, QUALITY_THRESHOLD
 )
 
 ProgressCB = Optional[Callable[[str, int], None]]
@@ -282,7 +282,9 @@ class GlobalFaceCluster:
                         )
                         self.all_faces.append(global_face)
                     else:
-                        print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
+                        # Логируем только лица с очень низким качеством (score < 0.1) для уменьшения шума
+                        if quality_score < 0.1:
+                            print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
 
                 processed_images += 1
 

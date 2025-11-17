@@ -40,7 +40,7 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
 ProgressCB = Optional[Callable[[str, int], None]]
 
 # Параметры качества распознавания (глобальные)
-QUALITY_THRESHOLD = 0.75  # Базовый порог качества
+QUALITY_THRESHOLD = 0.4  # Базовый порог качества (понижен для лучшего захвата лиц)
 MIN_FACE_SIZE = 64        # Минимальный размер лица в пикселях
 MAX_FACE_SIZE = 512       # Максимальный размер лица в пикселях
 MAX_FACE_ANGLE = 30       # Максимальный угол поворота лица (градусы)
@@ -195,8 +195,7 @@ def _advanced_rescue_low_quality_faces(rejected_faces: List[Dict], img: np.ndarr
         return rescue_result.rescued_faces
 
     except ImportError:
-        # Fallback к старой системе если AdvancedFaceRescue недоступен
-        print("⚠️ AdvancedFaceRescue not available, using legacy rescue")
+        # Fallback к старой системе если AdvancedFaceRescue недоступен (тихо, без предупреждения)
         return _legacy_rescue_low_quality_faces(rejected_faces, img, img_path)
 
 
@@ -856,12 +855,14 @@ def build_plan_pro(
                 validated_faces.append(face)
             else:
                 rejected_faces.append(face)
-                print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
-                if 'validation_details' in face:
-                    details = face['validation_details']
-                    print(f"   └─ Первичный: {details['primary_score']:.2f}, "
-                          f"Вторичный: {details['secondary_score']:.2f}, "
-                          f"Согласованность: {details['cross_validation_score']:.2f}")
+                # Логируем только лица с очень низким качеством (score < 0.1) для уменьшения шума
+                if quality_score < 0.1:
+                    print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
+                    if 'validation_details' in face:
+                        details = face['validation_details']
+                        print(f"   └─ Первичный: {details['primary_score']:.2f}, "
+                              f"Вторичный: {details['secondary_score']:.2f}, "
+                              f"Согласованность: {details['cross_validation_score']:.2f}")
 
         # Если нет валидных лиц, но есть отклоненные - попробуем rescue низкокачественные
         if not validated_faces and rejected_faces:
