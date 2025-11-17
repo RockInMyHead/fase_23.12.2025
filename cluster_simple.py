@@ -837,37 +837,14 @@ def build_plan_pro(
             no_faces.append(img_path)
             continue
 
-        # Валидация качества лиц
+        # Все лица принимаются без валидации качества
         validated_faces = []
-        rejected_faces = []
 
         for face in faces:
-            # Определяем тип данных и выбираем метод валидации
-            if 'quality_details' in face and 'cross_validated' in face:
-                # Данные от DualFaceEmbedder - используем двойную валидацию
-                quality_score, validation_details = validate_face_quality_dual(face, img)
-                face['validation_details'] = validation_details  # Сохраняем детали для анализа
-            else:
-                # Обычные данные - используем стандартную валидацию
-                quality_score = validate_face_quality(face, img)
+            # Принимаем все лица независимо от качества
+            validated_faces.append(face)
 
-            if quality_score >= QUALITY_THRESHOLD:
-                validated_faces.append(face)
-            else:
-                rejected_faces.append(face)
-                # Логируем только лица с очень низким качеством (score < 0.1) для уменьшения шума
-                if quality_score < 0.1:
-                    print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
-                    if 'validation_details' in face:
-                        details = face['validation_details']
-                        print(f"   └─ Первичный: {details['primary_score']:.2f}, "
-                              f"Вторичный: {details['secondary_score']:.2f}, "
-                              f"Согласованность: {details['cross_validation_score']:.2f}")
-
-        # Если нет валидных лиц, но есть отклоненные - попробуем rescue низкокачественные
-        if not validated_faces and rejected_faces:
-            rescued_faces = _advanced_rescue_low_quality_faces(rejected_faces, img, img_path, emb)
-            validated_faces.extend(rescued_faces)
+        # Rescue больше не нужен, так как все лица принимаются
 
         if not validated_faces:
             no_faces.append(img_path)

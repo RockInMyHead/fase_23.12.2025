@@ -267,24 +267,15 @@ class GlobalFaceCluster:
                 if not faces:
                     continue
 
-                # Валидация качества лиц и добавление в глобальный список
+                # Добавляем все лица независимо от качества
                 for face_idx, face in enumerate(faces):
-                    # Проверка качества лица
-                    quality_score = self._validate_face_quality(face, img)
-
-                    # Добавляем только лица достаточного качества
-                    if quality_score >= self.quality_threshold:
-                        global_face = GlobalFace(
-                            embedding=face["embedding"],
-                            image_path=img_path,
-                            folder_name=folder_name,
-                            face_idx=face_idx
-                        )
-                        self.all_faces.append(global_face)
-                    else:
-                        # Логируем только лица с очень низким качеством (score < 0.1) для уменьшения шума
-                        if quality_score < 0.1:
-                            print(f"⚠️ Пропущено лицо низкого качества (score={quality_score:.2f}) на {img_path}")
+                    global_face = GlobalFace(
+                        embedding=face["embedding"],
+                        image_path=img_path,
+                        folder_name=folder_name,
+                        face_idx=face_idx
+                    )
+                    self.all_faces.append(global_face)
 
                 processed_images += 1
 
