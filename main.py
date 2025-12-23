@@ -548,6 +548,9 @@ async def process_folder_task(task_id: str, folder_path: str, include_excluded: 
         app_state["current_tasks"][task_id]["result"] = result.model_dump()
 
     except Exception as e:
+        print(f"❌ [TASK] Критическая ошибка в задаче {task_id}: {e}")
+        import traceback
+        traceback.print_exc()
         app_state["current_tasks"][task_id]["status"] = "error"
         app_state["current_tasks"][task_id]["error"] = str(e)
         app_state["current_tasks"][task_id]["message"] = f"Ошибка: {str(e)}"

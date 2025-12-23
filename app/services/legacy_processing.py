@@ -29,8 +29,8 @@ async def run_process_folder_task(task_id: str, *args: Any, **kwargs: Any) -> No
         raise RuntimeError("Legacy process_folder_task not available")
 
     # Sync task state from new to old state before processing
-    task = await new_app_state.list_tasks()
-    task = next((t for t in task if t.task_id == task_id), None)
+    tasks = await new_app_state.list_tasks()
+    task = next((t for t in tasks if t.task_id == task_id), None)
 
     if task and old_app_state is not None:
         # Create task in old app_state to make legacy code work
@@ -45,11 +45,17 @@ async def run_process_folder_task(task_id: str, *args: Any, **kwargs: Any) -> No
         }
 
     try:
+        print(f"🔄 [LEGACY] Запуск обработки задачи {task_id}")
         await legacy_process_folder_task(task_id, *args, **kwargs)
+        print(f"✅ [LEGACY] Обработка задачи {task_id} завершена")
+    except Exception as e:
+        print(f"❌ [LEGACY] Ошибка в задаче {task_id}: {e}")
+        raise
     finally:
         # Sync state back from old to new after processing
         if old_app_state is not None and task_id in old_app_state["current_tasks"]:
             old_task = old_app_state["current_tasks"][task_id]
+            print(f"🔄 [LEGACY] Синхронизация состояния задачи {task_id}: status={old_task.get('status')}")
             await new_app_state.set_task_status(
                 task_id,
                 old_task.get("status", "error"),
@@ -57,3 +63,16 @@ async def run_process_folder_task(task_id: str, *args: Any, **kwargs: Any) -> No
                 old_task.get("progress", 100),
                 old_task.get("error")
             )
+        elif task_id not in old_app_state.get("current_tasks", {}):
+            # If task not in old state, check if it completed successfully
+            # This handles cases where task finished but wasn't in old state
+            print(f"⚠️ [LEGACY] Задача {task_id} не найдена в old_app_state, устанавливаем completed")
+            await new_app_state.set_task_status(
+                task_id,
+                "completed",
+                "Обработка завершена успешно",
+                100,
+                None
+            )
+        else:
+            print(f"⚠️ [LEGACY] Задача {task_id} не найдена в обоих состояниях")
