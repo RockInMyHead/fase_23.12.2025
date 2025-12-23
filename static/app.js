@@ -31,6 +31,10 @@ class PhotoClusterApp {
         this.jointMode = 'copy'; // 'copy' or 'combine'
         this.postValidateCheckbox = document.getElementById('postValidateCheckbox');
         this.postValidate = false;
+        this.globalClusteringCheckbox = document.getElementById('globalClusteringCheckbox');
+        this.globalClustering = false;
+        this.continuousNumberingCheckbox = document.getElementById('continuousNumberingCheckbox');
+        this.continuousNumbering = false;
         this.addQueueBtn = document.getElementById('addQueueBtn');
         this.tasksList = document.getElementById('tasksList');
         this.clearTasksBtn = document.getElementById('clearTasksBtn');
@@ -69,6 +73,8 @@ class PhotoClusterApp {
             zipBtn: this.zipBtn,
             jointModeSelect: this.jointModeSelect,
             postValidateCheckbox: this.postValidateCheckbox,
+            globalClusteringCheckbox: this.globalClusteringCheckbox,
+            continuousNumberingCheckbox: this.continuousNumberingCheckbox,
             refreshBtn: this.autoRefreshBtn,
             fileToolbar: this.fileToolbar,
             contextMenu: this.contextMenu
@@ -83,6 +89,8 @@ class PhotoClusterApp {
         // Инициализируем селект режима
         this.jointModeSelect.value = this.jointMode;
         this.postValidateCheckbox.checked = this.postValidate;
+        this.globalClusteringCheckbox.checked = this.globalClustering;
+        this.continuousNumberingCheckbox.checked = this.continuousNumbering;
     }
 
     setupEventListeners() {
@@ -111,6 +119,18 @@ class PhotoClusterApp {
         this.postValidateCheckbox.addEventListener('change', (e) => {
             this.postValidate = e.target.checked;
             console.log('🔧 Post validate changed to:', this.postValidate);
+        });
+
+        // Глобальная кластеризация
+        this.globalClusteringCheckbox.addEventListener('change', (e) => {
+            this.globalClustering = e.target.checked;
+            console.log('🔧 Global clustering changed to:', this.globalClustering);
+        });
+
+        // Непрерывная нумерация
+        this.continuousNumberingCheckbox.addEventListener('change', (e) => {
+            this.continuousNumbering = e.target.checked;
+            console.log('🔧 Continuous numbering changed to:', this.continuousNumbering);
         });
 
         // Кнопки обработки очереди
@@ -1028,7 +1048,7 @@ class PhotoClusterApp {
 
     async loadTasks() {
         try {
-            const response = await fetch('/api/tasks', { cache: 'no-store' });
+            const response = await fetch('/api/task/list', { cache: 'no-store' });
             const data = await response.json();
             
             // Обновляем только если есть изменения
@@ -1167,7 +1187,7 @@ class PhotoClusterApp {
 
     async clearCompletedTasks() {
         try {
-            const response = await fetch('/api/tasks/clear', {
+            const response = await fetch('/api/task/clear', {
                 method: 'DELETE',
                 cache: 'no-store'
             });
@@ -1477,7 +1497,7 @@ class PhotoClusterApp {
 
     async updateTasks() {
         try {
-            const response = await fetch('/api/tasks');
+            const response = await fetch('/api/task/list');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -1545,7 +1565,7 @@ class PhotoClusterApp {
             this.clearTasksBtn.disabled = true;
             this.clearTasksBtn.innerHTML = '<div class="loading"></div> Очистка...';
 
-            const response = await fetch('/api/tasks/clear', { method: 'POST' });
+            const response = await fetch('/api/task/clear', { method: 'POST' });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }

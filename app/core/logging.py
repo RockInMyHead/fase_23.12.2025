@@ -70,7 +70,7 @@ def setup_logging(
         )
 
 
-def get_logger(name: str) -> structlog.BoundLoggerWithContext:
+def get_logger(name: str):
     """
     Get a structured logger instance
 

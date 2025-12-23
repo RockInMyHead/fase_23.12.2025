@@ -8,15 +8,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 
 from .core.config import settings
 from .core.logging import setup_logging, get_logger
 from .api.routes import files, clustering, tasks
 from .models.schemas import DriveInfoResponse
+from .utils.file_utils import get_logical_drives
 
 # Setup logging
 setup_logging()
@@ -57,7 +59,8 @@ static_path = Path(__file__).parent.parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-# Include API routes
+# Include API routes - order matters for path matching
+# More specific routes first
 app.include_router(
     files.router,
     prefix="/api",
@@ -72,7 +75,7 @@ app.include_router(
 
 app.include_router(
     tasks.router,
-    prefix="/api",
+    prefix="/api/task",
     tags=["tasks"]
 )
 
@@ -95,8 +98,6 @@ async def get_index():
 async def get_drives():
     """Get available drives"""
     try:
-        from ..utils.file_utils import get_logical_drives
-
         drives = get_logical_drives()
         return [
             DriveInfoResponse(
@@ -114,6 +115,34 @@ async def get_drives():
 async def favicon():
     """Serve favicon"""
     return {"detail": "No favicon available"}
+
+
+@app.get("/__routes", include_in_schema=False)
+def __routes():
+    """Debug endpoint to list all registered routes"""
+    out = []
+    for r in app.router.routes:
+        methods = sorted(list(getattr(r, "methods", []) or []))
+        out.append({
+            "path": getattr(r, "path", ""),
+            "methods": methods,
+            "name": getattr(r, "name", "")
+        })
+    return out
+
+
+@app.api_route("/preview", methods=["GET", "HEAD"], include_in_schema=False)
+@app.api_route("/preview/", methods=["GET", "HEAD"], include_in_schema=False)
+async def preview_alias(request: Request):
+    """
+    Alias for /api/image/preview to support legacy frontend requests
+    Redirects /preview?... to /api/image/preview?...
+    """
+    qs = str(request.query_params)
+    if not qs:
+        return JSONResponse(status_code=400, content={"detail": "Missing query params"})
+
+    return RedirectResponse(url=f"/api/image/preview?{qs}", status_code=307)
 
 
 if __name__ == "__main__":

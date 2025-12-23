@@ -6,20 +6,32 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 
 from ...core.logging import get_logger
+from ...core.state import app_state
 from ...models.schemas import TaskResponse
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=List[TaskResponse])
+@router.get("/list")
 async def get_tasks():
     """
     Get all tasks
     """
     try:
-        # TODO: Implement task retrieval from task manager
-        return []
+        tasks = await app_state.list_tasks()
+        # Map TaskState to TaskResponse format
+        return [
+            {
+                "id": t.task_id,
+                "status": t.status,
+                "progress": t.progress,
+                "message": t.message,
+                "created_at": t.created_at,
+                "completed_at": None  # TODO: add completed_at to TaskState
+            }
+            for t in tasks
+        ]
 
     except Exception as e:
         logger.error(f"Failed to get tasks: {e}")
@@ -45,13 +57,13 @@ async def get_task(task_id: str):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.delete("/completed")
+@router.post("/clear")
 async def clear_completed_tasks():
     """
     Clear all completed tasks
     """
     try:
-        # TODO: Implement completed tasks clearing
+        await app_state.clear_tasks()
         return {"success": True}
 
     except Exception as e:

@@ -2,6 +2,7 @@
 Image processing utility functions
 """
 import base64
+import warnings
 from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple
@@ -25,13 +26,16 @@ def load_image_safe(path: Path) -> Optional[np.ndarray]:
         Image as numpy array or None if loading failed
     """
     try:
-        with Image.open(path) as img:
-            # Convert to RGB if necessary
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+        # Suppress PNG ICC profile warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*iCCP.*invalid rendering intent.*")
+            with Image.open(path) as img:
+                # Convert to RGB if necessary
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
 
-            # Return as numpy array
-            return np.array(img)
+                # Return as numpy array
+                return np.array(img)
     except Exception as e:
         logger.warning(f"Failed to load image {path}: {e}")
         return None
@@ -129,8 +133,11 @@ def get_image_dimensions(path: Path) -> Optional[Tuple[int, int]]:
         Tuple of (width, height) or None if failed
     """
     try:
-        with Image.open(path) as img:
-            return img.size
+        # Suppress PNG ICC profile warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*iCCP.*invalid rendering intent.*")
+            with Image.open(path) as img:
+                return img.size
     except Exception as e:
         logger.warning(f"Failed to get image dimensions for {path}: {e}")
         return None

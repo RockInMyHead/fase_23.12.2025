@@ -20,35 +20,37 @@ class LocalFileService(FileService):
 
     async def get_folder_contents(self, path: Path) -> List[FolderInfo]:
         """Get folder contents with metadata"""
-        try:
-            contents = []
+        contents: List[FolderInfo] = []
 
-            for item in path.iterdir():
-                try:
-                    stat = item.stat()
+        for item in path.iterdir():
+            try:
+                stat = item.stat()
+                is_dir = item.is_dir()
 
-                    folder_info = FolderInfo(
-                        name=item.name,
-                        path=str(item),
-                        type="directory" if item.is_dir() else "file",
-                        size=stat.st_size if item.is_file() else None,
-                        modified=stat.st_mtime,
-                        children_count=len(list(item.iterdir())) if item.is_dir() else None
-                    )
-                    contents.append(folder_info)
+                # Безопасный подсчет детей для директорий
+                children_count: Optional[int] = None
+                if is_dir:
+                    try:
+                        children_count = sum(1 for _ in item.iterdir())
+                    except (OSError, PermissionError):
+                        children_count = None
 
-                except (OSError, PermissionError) as e:
-                    logger.warning(f"Failed to get info for {item}: {e}")
-                    continue
+                contents.append(FolderInfo(
+                    name=item.name,
+                    path=item,  # лучше Path, чем str
+                    size=stat.st_size if item.is_file() else None,
+                    modified=stat.st_mtime,
+                    children_count=children_count,
+                ))
 
-            # Sort: directories first, then files, alphabetically
-            contents.sort(key=lambda x: (x.type != "directory", x.name.lower()))
+            except (OSError, PermissionError) as e:
+                logger.warning("Failed to get info for %s: %s", item, e)
+                continue
 
-            return contents
+        # директории вверх, затем файлы
+        contents.sort(key=lambda x: (not Path(x.path).is_dir(), x.name.lower()))
 
-        except Exception as e:
-            logger.error(f"Failed to get folder contents for {path}: {e}")
-            return []
+        return contents
 
     async def create_folder(self, path: Path, name: str) -> Path:
         """Create new folder"""

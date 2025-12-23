@@ -129,6 +129,11 @@ def align_face_5points(img: np.ndarray, landmarks: np.ndarray, target_size=(112,
     Выравнивание лица по 5 ключевым точкам (глаза, нос, углы рта).
     Стандартная процедура для ArcFace/InsightFace.
     """
+    # Валидация входных данных
+    if target_size[0] <= 0 or target_size[1] <= 0:
+        print(f"⚠️ Неверный target_size: {target_size}, используем (112, 112)")
+        target_size = (112, 112)
+
     # Стандартные позиции для 112x112
     src = np.array([
         [38.2946, 51.6963],  # Левый глаз
@@ -137,19 +142,24 @@ def align_face_5points(img: np.ndarray, landmarks: np.ndarray, target_size=(112,
         [41.5493, 92.3655],  # Левый угол рта
         [70.7299, 92.2041]   # Правый угол рта
     ], dtype=np.float32)
-    
+
     # Масштабируем для целевого размера
     if target_size != (112, 112):
         scale = target_size[0] / 112.0
         src = src * scale
-    
+
     # Преобразование Affine
     dst = landmarks.astype(np.float32)
     tform = cv2.estimateAffinePartial2D(dst, src)[0]
-    
+
     if tform is None:
-        # Fallback: просто изменяем размер
-        return cv2.resize(img, target_size)
+        # Fallback: просто изменяем размер с дополнительной валидацией
+        try:
+            return cv2.resize(img, target_size)
+        except cv2.error as e:
+            print(f"❌ Ошибка cv2.resize с target_size {target_size}: {e}")
+            # Возвращаем оригинальное изображение если resize не удался
+            return img
     
     aligned = cv2.warpAffine(img, tform, target_size, flags=cv2.INTER_LINEAR)
     return aligned

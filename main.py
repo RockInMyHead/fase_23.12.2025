@@ -49,6 +49,9 @@ def test_method(method_name):
 USE_FACE_RECOGNITION = False
 INSIGHTFACE_MODEL = None
 
+# Импортируем доступные методы кластеризации
+build_plan_fallback = None
+
 # Тестируем insightface
 insightface_result = test_method("insightface")
 if insightface_result:
@@ -57,6 +60,15 @@ if insightface_result:
         from global_cluster import process_group_global
         INSIGHTFACE_MODEL = insightface_result
         print(f"✅ Используется InsightFace ({insightface_result}) - лучшее качество распознавания")
+
+        # Также пробуем импортировать face_recognition как fallback
+        if test_method("face_recognition"):
+            try:
+                from cluster_face_recognition import build_plan_face_recognition as build_plan_fallback
+                print("✅ Face Recognition доступен как запасной вариант")
+            except ImportError:
+                pass
+
     except ImportError as e:
         print(f"⚠️ Ошибка импорта insightface модуля: {e}")
         USE_FACE_RECOGNITION = True
@@ -440,12 +452,22 @@ async def process_folder_task(task_id: str, folder_path: str, include_excluded: 
                         )
                     plan = await loop.run_in_executor(executor, clustering_func)
                 except Exception as e:
-                    print(f"⚠️ Ошибка ADVANCED кластеризации, fallback на стандартную: {e}")
-                    plan = await loop.run_in_executor(
-                        executor,
-                        functools.partial(build_plan_advanced, input_dir=path, progress_callback=progress_callback,
-                                        joint_mode=joint_mode, model_name=INSIGHTFACE_MODEL or "buffalo_l")
-                    )
+                    print(f"⚠️ Ошибка ADVANCED кластеризации, fallback на запасной метод: {e}")
+                    # Пробуем face_recognition как fallback
+                    if build_plan_fallback is not None:
+                        print("🔄 Используем Face Recognition как запасной метод")
+                        try:
+                            plan = await loop.run_in_executor(
+                                executor,
+                                functools.partial(build_plan_fallback, input_dir=path, progress_callback=progress_callback,
+                                                sim_threshold=0.6, min_cluster_size=2, joint_mode=joint_mode, model="hog")
+                            )
+                        except Exception as e2:
+                            print(f"⚠️ Ошибка и запасного метода: {e2}, переходим к упрощенной кластеризации")
+                            raise e  # Re-raise original error to trigger final error handling
+                    else:
+                        print("⚠️ Запасной метод недоступен, переходим к упрощенной кластеризации")
+                        raise e  # Re-raise original error to trigger final error handling
             else:
                 print(f"🚀 [TASK] Запускаю стандартную кластеризацию для {folder_path}")
                 # Стандартная кластеризация
@@ -456,9 +478,24 @@ async def process_folder_task(task_id: str, folder_path: str, include_excluded: 
                                         model_name=INSIGHTFACE_MODEL or "buffalo_l")
                     )
                 except Exception as e:
-                    app_state["current_tasks"][task_id]["status"] = "error"
-                    app_state["current_tasks"][task_id]["error"] = str(e)
-                    return
+                    print(f"⚠️ Ошибка стандартной кластеризации: {e}")
+                    # Пробуем face_recognition как последний шанс
+                    if build_plan_fallback is not None and not USE_FACE_RECOGNITION:
+                        print("🔄 Последний шанс: используем Face Recognition")
+                        try:
+                            plan = await loop.run_in_executor(
+                                executor,
+                                functools.partial(build_plan_fallback, input_dir=path, progress_callback=progress_callback,
+                                                sim_threshold=0.6, min_cluster_size=2, joint_mode=joint_mode, model="hog")
+                            )
+                        except Exception as e2:
+                            app_state["current_tasks"][task_id]["status"] = "error"
+                            app_state["current_tasks"][task_id]["error"] = f"Все методы кластеризации неудачны: {e}, {e2}"
+                            return
+                    else:
+                        app_state["current_tasks"][task_id]["status"] = "error"
+                        app_state["current_tasks"][task_id]["error"] = str(e)
+                        return
 
             # Проверка результата
             if not isinstance(plan, dict):
