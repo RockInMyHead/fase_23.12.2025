@@ -563,6 +563,13 @@ def post_process_clusters_simple(X: np.ndarray, owners: List[Path], labels: np.n
     # Удаление шумовых кластеров
     X, owners, labels = remove_noise_clusters_simple(X, owners, labels, cluster_indices)
 
+    # ПЕРЕСОЗДАТЬ индексы кластеров после фильтрации
+    cluster_indices = {}
+    for i, label in enumerate(labels):
+        if label not in cluster_indices:
+            cluster_indices[label] = []
+        cluster_indices[label].append(i)
+
     # Объединение близких кластеров
     X, owners, labels = merge_similar_clusters_simple(X, owners, labels, cluster_indices)
 
@@ -641,7 +648,11 @@ def merge_similar_clusters_simple(X: np.ndarray, owners: List[Path], labels: np.
     centroids = {}
     for cluster_id in unique_labels:
         indices = cluster_indices[cluster_id]
-        centroids[cluster_id] = np.mean(X[indices], axis=0)
+        # Валидация индексов - убедиться, что они не выходят за границы
+        valid_indices = [i for i in indices if 0 <= i < len(X)]
+        if not valid_indices:
+            continue
+        centroids[cluster_id] = np.mean(X[valid_indices], axis=0)
 
     # Найти пары для объединения
     merge_threshold = 0.75  # Более строгий порог для локальной кластеризации
